@@ -6,13 +6,19 @@ from pygame.locals import *
 
 WIDTH = 4
 WINDOW_WIDTH = 600
+WALL_WIDTH = 500 // WIDTH
 
 global playground
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_WIDTH))
-WHITE = pygame.Color('white')
-BLACK = pygame.Color('black')
+pygame.event.set_allowed([12, KEYUP])
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
 
 
 class Play:
@@ -24,7 +30,7 @@ class Play:
         self.init_playground()
         self.random_generate()
         print('init:(%s * %s)' % (width, width))
-        self.show_playground()
+        print(self.playground)
 
     def init_playground(self):
         self.playground = np.zeros((self.width, self.width), dtype=int)
@@ -43,9 +49,11 @@ class Play:
         # for row, col in random.sample(self.empty_list, np.random.randint(1, 3)):
         #     self.playground[row][col] = np.random.choice([2, 4])
 
-    def show_playground(self):
-        print(self.playground)
+    def get_playground(self):
+        return self.playground
 
+    def is_terminal(self):
+        return self.terminal
 
     def move(self, direction):
         if self.terminal:
@@ -74,14 +82,14 @@ class Play:
         if move_success:
             print('move %s' % direction)
             self.random_generate()
-            self.show_playground()
+            print(self.playground)
 
     def restart(self):
         self.terminal = False
         self.init_playground()
         self.random_generate()
         print('restart:')
-        self.show_playground()
+        print(self.playground)
 
 def realize_slide(ground):
     for i in range(len(ground)):
@@ -108,8 +116,26 @@ def realize_slide(ground):
                 else:
                     ground[i][j] = 0
 
-def detect_keys(play):
+
+def running(play):
+    is_updated = True
     while True:
+        if is_updated:
+            screen.fill(WHITE)
+            ground = play.get_playground()
+            x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
+            for i in range(WIDTH):
+                for j in range(WIDTH):
+                    x_pos = x_start + WALL_WIDTH * i
+                    y_pos = y_start + WALL_WIDTH * j
+                    if ground[i][j] != 0:
+                        pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
+                        screen.blit(pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True, BLACK), (
+                        y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
+                    pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
+            is_updated = False
+            if play.is_terminal():
+                screen.blit(pygame.font.SysFont('simsunnsimsun', 100).render('按R重开', True, BLACK), (100, 100))
         for event in pygame.event.get():
             if event.type == QUIT:
                 sys.exit()
@@ -124,11 +150,14 @@ def detect_keys(play):
                     play.move('down')
                 elif event.key == K_r:
                     play.restart()
+                is_updated = True
+        pygame.display.flip()
+        pygame.event.pump()
 
 
 def main():
     play = Play(WIDTH)
-    detect_keys(play)
+    running(play)
 
 
 if __name__ == '__main__':
