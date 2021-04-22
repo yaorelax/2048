@@ -4,7 +4,7 @@ import sys
 import random
 from pygame.locals import *
 
-WIDTH = 7
+WIDTH = 4
 WINDOW_WIDTH = 600
 
 global playground
@@ -34,7 +34,6 @@ class Play:
 
     def random_generate(self, number=2, n=2):
         self.generate_empty_list()
-        print(len(self.empty_list), self.empty_list)
         if len(self.empty_list) < n:
             self.terminal = True
             print('game is over, press R to restart!')
@@ -50,13 +49,36 @@ class Play:
             print('game is over, press R to restart!')
             return
         move_success = True
-        if direction == 'up':
+        if direction == 'left':
+            for i in range(self.width):
+                tmp = []
+                for a in self.playground[i]:
+                    if a != 0:
+                        tmp.append(a)
+                if len(tmp) == 0:
+                    continue
+                elif len(tmp) >= 1:
+                    for _ in range(len(tmp) - 1):
+                        tip = 0
+                        while True:
+                            if tip < len(tmp) - 1:
+                                if tmp[tip] == tmp[tip + 1]:
+                                    tmp[tip] *= 2
+                                    del tmp[tip + 1]
+                                tip += 1
+                            else:
+                                break
+                    for j in range(self.width):
+                        if j < len(tmp):
+                            self.playground[i][j] = tmp[j]
+                        else:
+                            self.playground[i][j] = 0
+
+        elif direction == 'right':
+            pass
+        elif direction == 'up':
             pass
         elif direction == 'down':
-            pass
-        elif direction == 'left':
-            pass
-        elif direction == 'right':
             pass
         else:
             move_success = False
@@ -67,11 +89,12 @@ class Play:
             self.show_playground()
 
     def restart(self):
-        self.terminal = True
+        self.terminal = False
         self.init_playground()
         self.random_generate()
         print('restart:')
         self.show_playground()
+
 
 
 def detect_keys(play):
