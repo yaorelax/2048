@@ -40,9 +40,12 @@ class Play:
             return
         for row, col in random.sample(self.empty_list, n):
             self.playground[row][col] = number
+        # for row, col in random.sample(self.empty_list, np.random.randint(1, 3)):
+        #     self.playground[row][col] = np.random.choice([2, 4])
 
     def show_playground(self):
         print(self.playground)
+
 
     def move(self, direction):
         if self.terminal:
@@ -50,36 +53,21 @@ class Play:
             return
         move_success = True
         if direction == 'left':
-            for i in range(self.width):
-                tmp = []
-                for a in self.playground[i]:
-                    if a != 0:
-                        tmp.append(a)
-                if len(tmp) == 0:
-                    continue
-                elif len(tmp) >= 1:
-                    for _ in range(len(tmp) - 1):
-                        tip = 0
-                        while True:
-                            if tip < len(tmp) - 1:
-                                if tmp[tip] == tmp[tip + 1]:
-                                    tmp[tip] *= 2
-                                    del tmp[tip + 1]
-                                tip += 1
-                            else:
-                                break
-                    for j in range(self.width):
-                        if j < len(tmp):
-                            self.playground[i][j] = tmp[j]
-                        else:
-                            self.playground[i][j] = 0
-
+            ground = self.playground
+            realize_slide(ground)
+            self.playground = ground
         elif direction == 'right':
-            pass
+            ground = np.flip(self.playground, axis=1)
+            realize_slide(ground)
+            self.playground = np.flip(ground, axis=1)
         elif direction == 'up':
-            pass
+            ground = self.playground.T
+            realize_slide(ground)
+            self.playground = ground.T
         elif direction == 'down':
-            pass
+            ground = np.flip(self.playground, axis=0).T
+            realize_slide(ground)
+            self.playground = np.flip(ground.T, axis=0)
         else:
             move_success = False
             print('Direction error!')
@@ -95,7 +83,30 @@ class Play:
         print('restart:')
         self.show_playground()
 
-
+def realize_slide(ground):
+    for i in range(len(ground)):
+        tmp = []
+        for a in ground[i]:
+            if a != 0:
+                tmp.append(a)
+        if len(tmp) == 0:
+            continue
+        elif len(tmp) >= 1:
+            for _ in range(len(tmp) - 1):
+                tip = 0
+                while True:
+                    if tip < len(tmp) - 1:
+                        if tmp[tip] == tmp[tip + 1]:
+                            tmp[tip] *= 2
+                            del tmp[tip + 1]
+                        tip += 1
+                    else:
+                        break
+            for j in range(len(ground)):
+                if j < len(tmp):
+                    ground[i][j] = tmp[j]
+                else:
+                    ground[i][j] = 0
 
 def detect_keys(play):
     while True:
