@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pygame.locals import *
 
-WIDTH = 4
+WIDTH = 20
 WINDOW_WIDTH = 600
 WALL_WIDTH = 500 // WIDTH
 
@@ -40,84 +40,38 @@ class ANet(nn.Module):  # a(s)=a
         actions_value = x * 2
         return actions_value
 
-class Play:
+class Play2048:
     def __init__(self, width, debug=False):
-        self.debug = debug
-        self.terminal = False
-        self.playground = None
-        self.empty_list = []
-        self.width = width
-        self.init_playground()
-        self.random_generate()
-        if self.debug:
+        self.__debug = debug
+        self.__terminal = False
+        self.__playground = None
+        self.__empty_list = []
+        self.__width = width
+        self.__init_playground()
+        self.__random_generate()
+        if self.__debug:
             print('init:(%s * %s)' % (width, width))
-            print(self.playground)
+            print(self.__playground)
 
-    def init_playground(self):
-        self.playground = np.zeros((self.width, self.width), dtype=int)
+    def __init_playground(self):
+        self.__playground = np.zeros((self.__width, self.__width), dtype=int)
 
-    def generate_empty_list(self):
-        self.empty_list = list(np.argwhere(self.playground == 0))
+    def __generate_empty_list(self):
+        self.__empty_list = list(np.argwhere(self.__playground == 0))
 
-    def random_generate(self, number=2, n=2):
-        self.generate_empty_list()
-        if len(self.empty_list) < n:
-            self.terminal = True
-            if self.debug:
+    def __random_generate(self, number=2, n=2):
+        self.__generate_empty_list()
+        if len(self.__empty_list) < n:
+            self.__terminal = True
+            if self.__debug:
                 print('game is over, press R to restart!')
             return
-        for row, col in random.sample(self.empty_list, n):
-            self.playground[row][col] = number
+        for row, col in random.sample(self.__empty_list, n):
+            self.__playground[row][col] = number
         # for row, col in random.sample(self.empty_list, np.random.randint(1, 3)):
         #     self.playground[row][col] = np.random.choice([2, 4])
 
-    def get_playground(self):
-        return self.playground
-
-    def is_terminal(self):
-        return self.terminal
-
-    def move(self, direction):
-        if self.terminal:
-            if self.debug:
-                print('game is over, press R to restart!')
-            return
-        move_success = True
-        if direction == 'left':
-            ground = self.playground
-            self.realize_slide(ground)
-            self.playground = ground
-        elif direction == 'right':
-            ground = np.flip(self.playground, axis=1)
-            self.realize_slide(ground)
-            self.playground = np.flip(ground, axis=1)
-        elif direction == 'up':
-            ground = self.playground.T
-            self.realize_slide(ground)
-            self.playground = ground.T
-        elif direction == 'down':
-            ground = np.flip(self.playground, axis=0).T
-            self.realize_slide(ground)
-            self.playground = np.flip(ground.T, axis=0)
-        else:
-            move_success = False
-            print('Direction error!')
-        if move_success:
-            if self.debug:
-                print('move %s' % direction)
-            self.random_generate()
-            if self.debug:
-                print(self.playground)
-
-    def restart(self):
-        self.terminal = False
-        self.init_playground()
-        self.random_generate()
-        if self.debug:
-            print('restart:')
-            print(self.playground)
-
-    def realize_slide(self, ground):
+    def __realize_slide(self, ground):
         for i in range(len(ground)):
             tmp = []
             for a in ground[i]:
@@ -141,6 +95,57 @@ class Play:
                         ground[i][j] = tmp[j]
                     else:
                         ground[i][j] = 0
+
+    def get_score(self):
+        return sum(sum(self.__playground))
+
+    def get_playground(self):
+        return self.__playground
+
+    def is_terminal(self):
+        return self.__terminal
+
+    def move(self, direction):
+        if self.__terminal:
+            if self.__debug:
+                print('game is over, press R to restart!')
+            return
+        move_success = True
+        if direction == 'left':
+            ground = self.__playground
+            self.__realize_slide(ground)
+            self.__playground = ground
+        elif direction == 'right':
+            ground = np.flip(self.__playground, axis=1)
+            self.__realize_slide(ground)
+            self.__playground = np.flip(ground, axis=1)
+        elif direction == 'up':
+            ground = self.__playground.T
+            self.__realize_slide(ground)
+            self.__playground = ground.T
+        elif direction == 'down':
+            ground = np.flip(self.__playground, axis=0).T
+            self.__realize_slide(ground)
+            self.__playground = np.flip(ground.T, axis=0)
+        else:
+            move_success = False
+            print('Direction error!')
+        if move_success:
+            if self.__debug:
+                print('move %s' % direction)
+            self.__random_generate()
+            if self.__debug:
+                print(self.__playground)
+
+    def restart(self):
+        self.__terminal = False
+        self.__init_playground()
+        self.__random_generate()
+        if self.__debug:
+            print('restart:')
+            print(self.__playground)
+
+
 
 
 
@@ -213,11 +218,11 @@ def ai_play(play):
             play.move('down')
             is_updated = True
         else:
-            print('score:', sum(sum(play.get_playground())))
+            print('score:', play.get_score())
             play.restart()
 
 def main():
-    play = Play(WIDTH, debug=False)
+    play = Play2048(WIDTH, debug=False)
     # human_play(play)
     ai_play(play)
 
