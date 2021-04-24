@@ -2,6 +2,10 @@ import numpy as np
 import pygame
 import sys
 import random
+import time
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from pygame.locals import *
 
 WIDTH = 4
@@ -20,17 +24,34 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 
+class ANet(nn.Module):  # a(s)=a
+    def __init__(self, s_dim, a_dim):
+        super(ANet, self).__init__()
+        self.fc1 = nn.Linear(s_dim, 30)
+        self.fc1.weight.data.normal_(0, 0.1)  # initialization
+        self.out = nn.Linear(30, a_dim)
+        self.out.weight.data.normal_(0, 0.1)  # initialization
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.out(x)
+        x = torch.tanh(x)
+        actions_value = x * 2
+        return actions_value
 
 class Play:
-    def __init__(self, width):
+    def __init__(self, width, debug=False):
+        self.debug = debug
         self.terminal = False
         self.playground = None
         self.empty_list = []
         self.width = width
         self.init_playground()
         self.random_generate()
-        print('init:(%s * %s)' % (width, width))
-        print(self.playground)
+        if self.debug:
+            print('init:(%s * %s)' % (width, width))
+            print(self.playground)
 
     def init_playground(self):
         self.playground = np.zeros((self.width, self.width), dtype=int)
@@ -42,7 +63,8 @@ class Play:
         self.generate_empty_list()
         if len(self.empty_list) < n:
             self.terminal = True
-            print('game is over, press R to restart!')
+            if self.debug:
+                print('game is over, press R to restart!')
             return
         for row, col in random.sample(self.empty_list, n):
             self.playground[row][col] = number
@@ -57,67 +79,72 @@ class Play:
 
     def move(self, direction):
         if self.terminal:
-            print('game is over, press R to restart!')
+            if self.debug:
+                print('game is over, press R to restart!')
             return
         move_success = True
         if direction == 'left':
             ground = self.playground
-            realize_slide(ground)
+            self.realize_slide(ground)
             self.playground = ground
         elif direction == 'right':
             ground = np.flip(self.playground, axis=1)
-            realize_slide(ground)
+            self.realize_slide(ground)
             self.playground = np.flip(ground, axis=1)
         elif direction == 'up':
             ground = self.playground.T
-            realize_slide(ground)
+            self.realize_slide(ground)
             self.playground = ground.T
         elif direction == 'down':
             ground = np.flip(self.playground, axis=0).T
-            realize_slide(ground)
+            self.realize_slide(ground)
             self.playground = np.flip(ground.T, axis=0)
         else:
             move_success = False
             print('Direction error!')
         if move_success:
-            print('move %s' % direction)
+            if self.debug:
+                print('move %s' % direction)
             self.random_generate()
-            print(self.playground)
+            if self.debug:
+                print(self.playground)
 
     def restart(self):
         self.terminal = False
         self.init_playground()
         self.random_generate()
-        print('restart:')
-        print(self.playground)
+        if self.debug:
+            print('restart:')
+            print(self.playground)
 
-def realize_slide(ground):
-    for i in range(len(ground)):
-        tmp = []
-        for a in ground[i]:
-            if a != 0:
-                tmp.append(a)
-        if len(tmp) == 0:
-            continue
-        elif len(tmp) >= 1:
-            for _ in range(len(tmp) - 1):
-                tip = 0
-                while True:
-                    if tip < len(tmp) - 1:
-                        if tmp[tip] == tmp[tip + 1]:
-                            tmp[tip] *= 2
-                            del tmp[tip + 1]
-                        tip += 1
+    def realize_slide(self, ground):
+        for i in range(len(ground)):
+            tmp = []
+            for a in ground[i]:
+                if a != 0:
+                    tmp.append(a)
+            if len(tmp) == 0:
+                continue
+            elif len(tmp) >= 1:
+                for _ in range(len(tmp) - 1):
+                    tip = 0
+                    while True:
+                        if tip < len(tmp) - 1:
+                            if tmp[tip] == tmp[tip + 1]:
+                                tmp[tip] *= 2
+                                del tmp[tip + 1]
+                            tip += 1
+                        else:
+                            break
+                for j in range(len(ground)):
+                    if j < len(tmp):
+                        ground[i][j] = tmp[j]
                     else:
-                        break
-            for j in range(len(ground)):
-                if j < len(tmp):
-                    ground[i][j] = tmp[j]
-                else:
-                    ground[i][j] = 0
+                        ground[i][j] = 0
 
 
-def running(play):
+
+def human_play(play):
     is_updated = True
     while True:
         if is_updated:
@@ -130,8 +157,10 @@ def running(play):
                     y_pos = y_start + WALL_WIDTH * j
                     if ground[i][j] != 0:
                         pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
-                        screen.blit(pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True, BLACK), (
-                        y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
+                        screen.blit(
+                            pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True,
+                                                                                         BLACK), (
+                                y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
                     pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
             is_updated = False
             if play.is_terminal():
@@ -154,11 +183,43 @@ def running(play):
         pygame.display.flip()
         pygame.event.pump()
 
+def ai_play(play):
+    is_updated = True
+    while True:
+        if is_updated:
+            screen.fill(WHITE)
+            ground = play.get_playground()
+            x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
+            for i in range(WIDTH):
+                for j in range(WIDTH):
+                    x_pos = x_start + WALL_WIDTH * i
+                    y_pos = y_start + WALL_WIDTH * j
+                    if ground[i][j] != 0:
+                        pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
+                        screen.blit(
+                            pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True,
+                                                                                         BLACK), (
+                                y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
+                    pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
+            is_updated = False
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                sys.exit()
+        pygame.display.flip()
+        pygame.event.pump()
+
+        if not play.is_terminal():
+            play.move('left')
+            play.move('down')
+            is_updated = True
+        else:
+            print('score:', sum(sum(play.get_playground())))
+            play.restart()
 
 def main():
-    play = Play(WIDTH)
-    running(play)
-
+    play = Play(WIDTH, debug=False)
+    # human_play(play)
+    ai_play(play)
 
 if __name__ == '__main__':
     main()
