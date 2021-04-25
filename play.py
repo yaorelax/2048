@@ -7,11 +7,13 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from pygame.locals import *
 
 WIDTH = 4
 WINDOW_WIDTH = 600
 WALL_WIDTH = 450 // WIDTH
+MAX_EPISODE = 100
 
 global playground
 
@@ -69,8 +71,6 @@ class Play2048:
             self.__playground[row][col] = random.choice([2, 4])
             if self.__debug:
                 print('generate:', self.__playground[row][col])
-        # for row, col in random.sample(self.empty_list, np.random.randint(1, 3)):
-        #     self.playground[row][col] = np.random.choice([2, 4])
 
     def __realize_slide(self, ground):
         score = 0
@@ -218,9 +218,11 @@ def human_play(play):
         pygame.event.pump()
 
 
-def ai_play(play):
+def heuristic_algorithm(play, config):
     is_updated = True
     step = 0
+    episode = 0
+    scores = []
     while True:
         if is_updated:
             update_env(play)
@@ -235,16 +237,17 @@ def ai_play(play):
             assess_score = []
             assess_empty = []
             assess_succession = []
-            current_playgrond = play.get_playground()
-            current_empty = len(list(np.argwhere(current_playgrond == 0)))
+            assess_corner = []
+            current_playground = play.get_playground()
+            current_empty = len(list(np.argwhere(current_playground == 0)))
             current_succession = 0
             for i in range(WIDTH):
                 for j in range(WIDTH - 1):
-                    if current_playgrond[i][j] != 0:
-                        if current_playgrond[i][j] == current_playgrond[i][j + 1]:
+                    if current_playground[i][j] != 0:
+                        if current_playground[i][j] == current_playground[i][j + 1]:
                             current_succession += 1
                     if play.get_playground()[j][i] != 0:
-                        if current_playgrond[j][i] == current_playgrond[j + 1][i]:
+                        if current_playground[j][i] == current_playground[j + 1][i]:
                             current_succession += 1
             for direction in DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
@@ -260,21 +263,78 @@ def ai_play(play):
                             if next_playground[j][i] == next_playground[j + 1][i]:
                                 next_succession += 1
                 assess_succession.append(next_succession - current_succession)
-            assess = np.array([a + b + c for a, b, c in zip(assess_score, assess_empty, assess_succession)])
-            # print('step %s choose:' % step, DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
+
+                big_num_locs = list(np.argwhere(next_playground == np.max(next_playground)))
+                big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
+                                        [(0, 0), (0, WIDTH - 1), (WIDTH - 1, 0), (WIDTH - 1, WIDTH - 1)]] for row, col
+                                       in big_num_locs]
+                assess_corner.append(np.mean([max(t) for t in big_num_corner_diss]))
+
+            assess = np.array([a * config[0] + b * config[1] + c * config[2] + d * config[3] for a, b, c, d in
+                               zip(assess_score, assess_empty, assess_succession,
+                                   assess_corner)])
             play.move(DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
             is_updated = True
             step += 1
         else:
-            print('score:%4d, step:%4d' % (play.get_score(), step))
-            print(play.get_playground())
+            # print('score:%4d, step:%4d' % (play.get_score(), step))
+            # print(play.get_playground())
+            print('[%s]episode:%3d score:%4d' % (''.join(str(x) for x in config), episode, play.get_score()))
+            scores.append(play.get_score())
+            episode += 1
             step = 0
             play.restart()
+            if episode >= MAX_EPISODE:
+                return scores
+
+
+def ai_play(play):
+    configs = [[1, 0, 0, 0],
+               [0, 1, 0, 0],
+               [0, 0, 1, 0],
+               [0, 0, 0, 1],
+               [1, 1, 0, 0],
+               [1, 1, 1, 0],
+               [1, 1, 1, 1]]
+    name_list = [''.join(str(x) for x in config) for config in configs]
+    min_list = []
+    max_list = []
+    mean_list = []
+    var_list = []
+    x = list(range(len(configs)))
+    for config in configs:
+        scores = heuristic_algorithm(play, config)
+        min_list.append(np.min(scores))
+        max_list.append(np.max(scores))
+        mean_list.append(np.mean(scores))
+        var_list.append(np.var(scores))
+
+    plt.subplot(221)
+    plt.title('min')
+    plt.bar(x, min_list, tick_label=name_list)
+
+    plt.subplot(222)
+    plt.title('max')
+    plt.bar(x, max_list, tick_label=name_list)
+
+    plt.subplot(223)
+    plt.title('mean')
+    plt.bar(x, mean_list, tick_label=name_list)
+
+    plt.subplot(224)
+    plt.title('var')
+    plt.bar(x, var_list, tick_label=name_list)
+
+    plt.show()
+
+
 
 def main():
     play = Play2048(WIDTH, debug=False)
     # human_play(play)
     ai_play(play)
+
+
 
 if __name__ == '__main__':
     main()
