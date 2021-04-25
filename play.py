@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pygame.locals import *
 
-WIDTH = 10
+WIDTH = 4
 WINDOW_WIDTH = 600
 WALL_WIDTH = 500 // WIDTH
 
@@ -173,15 +173,16 @@ def update_env(play):
     screen.fill(WHITE)
     ground = play.get_playground()
     x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
+    pygame.draw.rect(screen, BLACK, [y_start - 1, x_start - 1, WIDTH * WALL_WIDTH + 2, WIDTH * WALL_WIDTH + 2], 1)
     for i in range(WIDTH):
         for j in range(WIDTH):
             x_pos = x_start + WALL_WIDTH * i
             y_pos = y_start + WALL_WIDTH * j
             if ground[i][j] != 0:
                 pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
-                map_text = pygame.font.Font(None, int(WALL_WIDTH * 2 / 3)).render(str(ground[i][j]), True, (106, 90, 205))
+                map_text = pygame.font.Font(None, int(WALL_WIDTH * 3 / 5)).render(str(ground[i][j]), True, (106, 90, 205))
                 text_rect = map_text.get_rect()
-                text_rect.center = (x_start + WALL_WIDTH * j + WALL_WIDTH / 2, y_start + WALL_WIDTH * i + WALL_WIDTH / 2)
+                text_rect.center = (y_pos + WALL_WIDTH / 2, x_pos + WALL_WIDTH / 2)
                 screen.blit(map_text, text_rect)
             pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
     if play.is_terminal():
@@ -232,12 +233,11 @@ def ai_play(play):
                 next_playground = play.fake_move(direction)
                 assess_score.append(sum(sum(next_playground)))
                 assess_empty.append(len(list(np.argwhere(next_playground == 0))))
-            assess = [a * b for a, b in zip(assess_score, assess_empty)]
+            assess = [a + b for a, b in zip(assess_score, assess_empty)]
             play.move(DIRECTIONS[np.argmax(assess)])
             is_updated = True
         else:
             print('score:', play.get_score())
-            time.sleep(2)
             play.restart()
 
 def main():
