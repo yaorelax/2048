@@ -3,6 +3,7 @@ import pygame
 import sys
 import random
 import time
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,7 +47,6 @@ class Play2048:
         self.__debug = debug
         self.__terminal = False
         self.__playground = None
-        self.__empty_list = []
         self.__width = width
         self.__score = 0
         self.__init_playground()
@@ -58,17 +58,14 @@ class Play2048:
     def __init_playground(self):
         self.__playground = np.zeros((self.__width, self.__width), dtype=int)
 
-    def __generate_empty_list(self):
-        self.__empty_list = list(np.argwhere(self.__playground == 0))
-
     def __random_generate(self, n=1):
-        self.__generate_empty_list()
-        if len(self.__empty_list) < n:
+        empty_list = list(np.argwhere(self.__playground == 0))
+        if len(empty_list) < n:
             self.__terminal = True
             if self.__debug:
                 print('game is over, press R to restart!')
             return
-        for row, col in random.sample(self.__empty_list, n):
+        for row, col in random.sample(empty_list, n):
             self.__playground[row][col] = random.choice([2, 4])
             if self.__debug:
                 print('generate:', self.__playground[row][col])
@@ -122,19 +119,15 @@ class Play2048:
         if direction == 'left':
             ground = self.__playground
             score = self.__realize_slide(ground)
-            self.__playground = ground
         elif direction == 'right':
             ground = np.flip(self.__playground, axis=1)
             score = self.__realize_slide(ground)
-            self.__playground = np.flip(ground, axis=1)
         elif direction == 'up':
             ground = self.__playground.T
             score = self.__realize_slide(ground)
-            self.__playground = ground.T
         elif direction == 'down':
             ground = np.flip(self.__playground, axis=0).T
             score = self.__realize_slide(ground)
-            self.__playground = np.flip(ground.T, axis=0)
         else:
             move_success = False
             print('Direction error!')
@@ -150,21 +143,17 @@ class Play2048:
         next_playground = None
         score = 0
         if direction == 'left':
-            ground = self.__playground
+            next_playground = ground = copy.deepcopy(self.__playground)
             score = self.__realize_slide(ground)
-            next_playground = ground
         elif direction == 'right':
-            ground = np.flip(self.__playground, axis=1)
+            next_playground = ground = copy.deepcopy(np.flip(self.__playground, axis=1))
             score = self.__realize_slide(ground)
-            next_playground = np.flip(ground, axis=1)
         elif direction == 'up':
-            ground = self.__playground.T
+            next_playground = ground = copy.deepcopy(self.__playground.T)
             score = self.__realize_slide(ground)
-            next_playground = ground.T
         elif direction == 'down':
-            ground = np.flip(self.__playground, axis=0).T
+            next_playground = ground = copy.deepcopy(np.flip(self.__playground, axis=0).T)
             score = self.__realize_slide(ground)
-            next_playground = np.flip(ground.T, axis=0)
         else:
             print('Direction error!')
         return next_playground, score
@@ -185,9 +174,9 @@ def update_env(play):
     x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
     pygame.draw.rect(screen, BLACK, [y_start - 1, x_start - 1, WIDTH * WALL_WIDTH + 2, WIDTH * WALL_WIDTH + 2], 1)
 
-    map_text = pygame.font.SysFont('simsunnsimsun', int(WALL_WIDTH * 3 / 5)).render('得分：%4d' % play.get_score(), True, (106, 90, 205))
+    map_text = pygame.font.SysFont('simsunnsimsun', int(y_start * 3 / 5)).render('得分：%4d' % play.get_score(), True, (106, 90, 205))
     text_rect = map_text.get_rect()
-    text_rect.center = (WINDOW_WIDTH / 2, (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 4)
+    text_rect.center = (WINDOW_WIDTH / 2, y_start / 2)
     screen.blit(map_text, text_rect)
     for i in range(WIDTH):
         for j in range(WIDTH):
@@ -231,6 +220,7 @@ def human_play(play):
 
 def ai_play(play):
     is_updated = True
+    step = 0
     while True:
         if is_updated:
             update_env(play)
@@ -248,17 +238,21 @@ def ai_play(play):
                 next_playground, score_of_onestep = play.fake_move(direction)
                 assess_score.append(score_of_onestep)
                 assess_empty.append(len(list(np.argwhere(next_playground == 0))))
-            assess = [a * b for a, b in zip(assess_score, assess_empty)]
+            assess = [a + b for a, b in zip(assess_score, assess_empty)]
+            # print('step%s choose:' % step, DIRECTIONS[np.argmax(assess)])
             play.move(DIRECTIONS[np.argmax(assess)])
             is_updated = True
+            step += 1
         else:
-            print('score:', play.get_score())
+            print('score:%4d, step:%4d' % (play.get_score(), step))
+            print(play.get_playground())
+            step = 0
             play.restart()
 
 def main():
     play = Play2048(WIDTH, debug=False)
-    human_play(play)
-    # ai_play(play)
+    # human_play(play)
+    ai_play(play)
 
 if __name__ == '__main__':
     main()
