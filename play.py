@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pygame.locals import *
 
-WIDTH = 20
+WIDTH = 10
 WINDOW_WIDTH = 600
 WALL_WIDTH = 500 // WIDTH
 
@@ -23,6 +23,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
+DIRECTIONS = ['left', 'right', 'up', 'down']
 
 class ANet(nn.Module):  # a(s)=a
     def __init__(self, s_dim, a_dim):
@@ -137,6 +138,28 @@ class Play2048:
             if self.__debug:
                 print(self.__playground)
 
+    def fake_move(self, direction):
+        next_playground = None
+        if direction == 'left':
+            ground = self.__playground
+            self.__realize_slide(ground)
+            next_playground = ground
+        elif direction == 'right':
+            ground = np.flip(self.__playground, axis=1)
+            self.__realize_slide(ground)
+            next_playground = np.flip(ground, axis=1)
+        elif direction == 'up':
+            ground = self.__playground.T
+            self.__realize_slide(ground)
+            next_playground = ground.T
+        elif direction == 'down':
+            ground = np.flip(self.__playground, axis=0).T
+            self.__realize_slide(ground)
+            next_playground = np.flip(ground.T, axis=0)
+        else:
+            print('Direction error!')
+        return next_playground
+
     def restart(self):
         self.__terminal = False
         self.__init_playground()
@@ -146,30 +169,31 @@ class Play2048:
             print(self.__playground)
 
 
-
+def update_env(play):
+    screen.fill(WHITE)
+    ground = play.get_playground()
+    x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
+    for i in range(WIDTH):
+        for j in range(WIDTH):
+            x_pos = x_start + WALL_WIDTH * i
+            y_pos = y_start + WALL_WIDTH * j
+            if ground[i][j] != 0:
+                pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
+                map_text = pygame.font.Font(None, int(WALL_WIDTH * 2 / 3)).render(str(ground[i][j]), True, (106, 90, 205))
+                text_rect = map_text.get_rect()
+                text_rect.center = (x_start + WALL_WIDTH * j + WALL_WIDTH / 2, y_start + WALL_WIDTH * i + WALL_WIDTH / 2)
+                screen.blit(map_text, text_rect)
+            pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
+    if play.is_terminal():
+        screen.blit(pygame.font.SysFont('simsunnsimsun', 100).render('按R重开', True, BLACK), (100, 100))
 
 
 def human_play(play):
     is_updated = True
     while True:
         if is_updated:
-            screen.fill(WHITE)
-            ground = play.get_playground()
-            x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
-            for i in range(WIDTH):
-                for j in range(WIDTH):
-                    x_pos = x_start + WALL_WIDTH * i
-                    y_pos = y_start + WALL_WIDTH * j
-                    if ground[i][j] != 0:
-                        pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
-                        screen.blit(
-                            pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True,
-                                                                                         BLACK), (
-                                y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
-                    pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
+            update_env(play)
             is_updated = False
-            if play.is_terminal():
-                screen.blit(pygame.font.SysFont('simsunnsimsun', 100).render('按R重开', True, BLACK), (100, 100))
         for event in pygame.event.get():
             if event.type == QUIT:
                 sys.exit()
@@ -188,24 +212,12 @@ def human_play(play):
         pygame.display.flip()
         pygame.event.pump()
 
+
 def ai_play(play):
     is_updated = True
     while True:
         if is_updated:
-            screen.fill(WHITE)
-            ground = play.get_playground()
-            x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
-            for i in range(WIDTH):
-                for j in range(WIDTH):
-                    x_pos = x_start + WALL_WIDTH * i
-                    y_pos = y_start + WALL_WIDTH * j
-                    if ground[i][j] != 0:
-                        pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
-                        screen.blit(
-                            pygame.font.SysFont('simsunnsimsun', WALL_WIDTH // 2).render(str(ground[i][j]), True,
-                                                                                         BLACK), (
-                                y_pos + WALL_WIDTH // 4, x_pos + WALL_WIDTH // 4))
-                    pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
+            update_env(play)
             is_updated = False
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -214,11 +226,18 @@ def ai_play(play):
         pygame.event.pump()
 
         if not play.is_terminal():
-            play.move('left')
-            play.move('down')
+            assess_score = []
+            assess_empty = []
+            for direction in DIRECTIONS:
+                next_playground = play.fake_move(direction)
+                assess_score.append(sum(sum(next_playground)))
+                assess_empty.append(len(list(np.argwhere(next_playground == 0))))
+            assess = [a * b for a, b in zip(assess_score, assess_empty)]
+            play.move(DIRECTIONS[np.argmax(assess)])
             is_updated = True
         else:
             print('score:', play.get_score())
+            time.sleep(2)
             play.restart()
 
 def main():
