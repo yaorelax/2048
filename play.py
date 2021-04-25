@@ -234,13 +234,35 @@ def ai_play(play):
         if not play.is_terminal():
             assess_score = []
             assess_empty = []
+            assess_succession = []
+            current_playgrond = play.get_playground()
+            current_empty = len(list(np.argwhere(current_playgrond == 0)))
+            current_succession = 0
+            for i in range(WIDTH):
+                for j in range(WIDTH - 1):
+                    if current_playgrond[i][j] != 0:
+                        if current_playgrond[i][j] == current_playgrond[i][j + 1]:
+                            current_succession += 1
+                    if play.get_playground()[j][i] != 0:
+                        if current_playgrond[j][i] == current_playgrond[j + 1][i]:
+                            current_succession += 1
             for direction in DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
                 assess_score.append(score_of_onestep)
-                assess_empty.append(len(list(np.argwhere(next_playground == 0))))
-            assess = [a + b for a, b in zip(assess_score, assess_empty)]
-            # print('step%s choose:' % step, DIRECTIONS[np.argmax(assess)])
-            play.move(DIRECTIONS[np.argmax(assess)])
+                assess_empty.append(len(list(np.argwhere(next_playground == 0))) - current_empty)
+                next_succession = 0
+                for i in range(WIDTH):
+                    for j in range(WIDTH - 1):
+                        if next_playground[i][j] != 0:
+                            if next_playground[i][j] == next_playground[i][j + 1]:
+                                next_succession += 1
+                        if next_playground[j][i] != 0:
+                            if next_playground[j][i] == next_playground[j + 1][i]:
+                                next_succession += 1
+                assess_succession.append(next_succession - current_succession)
+            assess = np.array([a + b + c for a, b, c in zip(assess_score, assess_empty, assess_succession)])
+            # print('step %s choose:' % step, DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
+            play.move(DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
             is_updated = True
             step += 1
         else:
