@@ -2,10 +2,11 @@ import numpy as np
 import pygame
 import sys
 import random
+import time
 import matplotlib.pyplot as plt
 from pygame.locals import *
 
-MAX_EPISODE = 10
+MAX_EPISODE = 50
 
 class ENV:
     WHITE = (255, 255, 255)
@@ -179,6 +180,15 @@ class Play2048:
             print('restart:')
             print(self.__playground)
 
+def coast_time(func):
+    def fun(*args, **kwargs):
+        t = time.perf_counter()
+        result = func(*args, **kwargs)
+        print(f'func {func.__name__} coast time:{time.perf_counter() - t:.8f} s')
+        return result
+
+    return fun
+
 def human_play(env):
     play = env.play
     is_updated = True
@@ -204,6 +214,7 @@ def human_play(env):
         pygame.display.flip()
         pygame.event.pump()
 
+@coast_time
 def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succession assess_corner
     play = env.play
 
@@ -295,6 +306,7 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             if episode >= MAX_EPISODE:
                 return scores
 
+@coast_time
 def expectimax_algorithm(env, max_depth):
     play = env.play
 
@@ -400,9 +412,13 @@ def expectimax_algorithm(env, max_depth):
 
 def ai_play(env):
     configs = []
-    # configs.append((heuristic_algorithm, [1, 1, 1, 1]))
-    configs.append((expectimax_algorithm, 4))
-    name_list = [''.join(str(x) for x in config) for config in configs]
+    # assess_score, assess_empty, assess_succession, assess_corner
+    configs.append((heuristic_algorithm, [4, 3, 3, 1]))
+    configs.append((heuristic_algorithm, [5, 4, 3, 1]))
+    configs.append((heuristic_algorithm, [10, 4, 3, 1]))
+    # max_depth
+    # configs.append((expectimax_algorithm, 4))
+    name_list = [''.join(str(x) for x in config) for _, config in configs]
     min_list = []
     max_list = []
     mean_list = []
@@ -423,15 +439,19 @@ def ai_play(env):
     plt.subplot(221)
     plt.title('min')
     plt.bar(x, min_list, tick_label=name_list)
+
     plt.subplot(222)
     plt.title('max')
     plt.bar(x, max_list, tick_label=name_list)
+
     plt.subplot(223)
     plt.title('mean')
     plt.bar(x, mean_list, tick_label=name_list)
+
     plt.subplot(224)
     plt.title('var')
     plt.bar(x, var_list, tick_label=name_list)
+
     plt.show()
 
 def main():
