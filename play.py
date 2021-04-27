@@ -318,6 +318,7 @@ def heuristic_algorithm(play, config):
                 return scores
 
 def ai_play(play):
+    # assess_score assess_empty assess_succession assess_corner
     configs = []
     # configs.append([1, 0, 0, 0])
     # configs.append([0, 1, 0, 0])
