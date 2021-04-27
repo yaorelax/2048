@@ -217,49 +217,48 @@ def human_play(play):
         pygame.display.flip()
         pygame.event.pump()
 
-def culculate_succession(ground):
-    result = 0
-    if True:
-        for i in range(WIDTH):
-            for j in range(WIDTH - 1):
-                if ground[i][j] != 0:
-                    if ground[i][j] == ground[i][j + 1]:
-                        result += 1
-                if ground[j][i] != 0:
-                    if ground[j][i] == ground[j + 1][i]:
-                        result += 1
-    else:
-        tmps = []
-        for i in range(WIDTH):
-            tmp1 = []
-            tmp2 = []
-            for j in range(WIDTH):
-                if ground[i][j] != 0:
-                    tmp1.append(ground[i][j])
-                if ground[j][i] != 0:
-                    tmp2.append(ground[j][i])
-            tmps.append(tmp1)
-            tmps.append(tmp2)
-        for tmp in tmps:
-            if len(tmp) <= 1:
-                break
-            tip_l = 0
-            tip_r = 1
-            while True:
-                if tmp[tip_l] != tmp[tip_r]:
-                    tip_l += 1
-                    tip_r += 1
-                else:
-                    result += 1
-                    tip_l += 2
-                    tip_r += 2
-                if tip_l >= len(tmp) or tip_r >= len(tmp):
-                    break
-    return result
-
-
 
 def heuristic_algorithm(play, config):
+    def culculate_succession(ground):
+        result = 0
+        if True:
+            for i in range(WIDTH):
+                for j in range(WIDTH - 1):
+                    if ground[i][j] != 0:
+                        if ground[i][j] == ground[i][j + 1]:
+                            result += 1
+                    if ground[j][i] != 0:
+                        if ground[j][i] == ground[j + 1][i]:
+                            result += 1
+        else:
+            tmps = []
+            for i in range(WIDTH):
+                tmp1 = []
+                tmp2 = []
+                for j in range(WIDTH):
+                    if ground[i][j] != 0:
+                        tmp1.append(ground[i][j])
+                    if ground[j][i] != 0:
+                        tmp2.append(ground[j][i])
+                tmps.append(tmp1)
+                tmps.append(tmp2)
+            for tmp in tmps:
+                if len(tmp) <= 1:
+                    break
+                tip_l = 0
+                tip_r = 1
+                while True:
+                    if tmp[tip_l] != tmp[tip_r]:
+                        tip_l += 1
+                        tip_r += 1
+                    else:
+                        result += 1
+                        tip_l += 2
+                        tip_r += 2
+                    if tip_l >= len(tmp) or tip_r >= len(tmp):
+                        break
+        return result
+
     is_updated = True
     step = 0
     episode = 0
