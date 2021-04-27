@@ -4,6 +4,7 @@ import sys
 import random
 import matplotlib.pyplot as plt
 from pygame.locals import *
+from threading import Thread
 
 MAX_EPISODE = 10
 
@@ -298,14 +299,37 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
 def expectimax_algorithm(env, max_depth):
     play = env.play
 
+    class MyThread(Thread):
+
+        def __init__(self, ground, depth):
+            Thread.__init__(self)
+            self.ground = ground
+            self.depth = depth
+
+        def run(self):
+            self.result = search(self.ground, self.depth)
+
+        def get_result(self):
+            return self.result
+
     def search(ground, depth, move=False):
         if depth == 0 or (move and play.is_terminal()):
             return heuristic(ground)
         alpha = heuristic(ground)
         if move:
+            alphas = [alpha]
+            threads = []
             for direction in play.DIRECTIONS:
                 child = play.fake_move(direction, ground)[0]
-                alpha = max(alpha, search(child, depth - 1))
+                t = MyThread(child, depth - 1)
+                threads.append(t)
+                t.start()
+            for t in threads:
+                t.join()
+            for t in threads:
+                alphas.append(t.get_result())
+            alpha = max(alphas)
+
         else:
             alpha = 0
             zeros = [(i, j) for i, j in list(np.argwhere(ground == 0))]
@@ -378,14 +402,23 @@ def expectimax_algorithm(env, max_depth):
 
         if not play.is_terminal():
             assess = []
+            threads = []
             for direction in play.DIRECTIONS:
                 next_playground = play.fake_move(direction)[0]
                 if np.all(next_playground == play.get_playground()):
-                    assess.append(-99999)
+                    threads.append(None)
                     continue
-                result = search(next_playground, max_depth)
-                assess.append(result)
-
+                t = MyThread(next_playground, max_depth)
+                threads.append(t)
+                t.start()
+            for t in threads:
+                if t is not None:
+                    t.join()
+            for t in threads:
+                if t is not None:
+                    assess.append(t.get_result())
+                else:
+                    assess.append(-99999)
             assess = np.array(assess)
 
             play.move(play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
