@@ -6,7 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from pygame.locals import *
 
-MAX_EPISODE = 50
+MAX_EPISODE = 10
 
 class ENV:
     WHITE = (255, 255, 255)
@@ -413,11 +413,12 @@ def expectimax_algorithm(env, max_depth):
 def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
+    configs.append((heuristic_algorithm, [1, 1, 1, 1]))
     configs.append((heuristic_algorithm, [4, 3, 3, 1]))
     configs.append((heuristic_algorithm, [5, 4, 3, 1]))
     configs.append((heuristic_algorithm, [10, 4, 3, 1]))
     # max_depth
-    # configs.append((expectimax_algorithm, 4))
+    configs.append((expectimax_algorithm, 4))
     name_list = [''.join(str(x) for x in config) for _, config in configs]
     min_list = []
     max_list = []
