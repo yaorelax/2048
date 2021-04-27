@@ -261,35 +261,30 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
         pygame.event.pump()
 
         if not play.is_terminal():
-            assess_score = []  # 单步得分
-            assess_empty = []  # 空格增加数
-            assess_succession = []  # 连续相同对数
-            assess_corner = []  # 评估大数在角落的程度
+            assess = []
             current_playground = play.get_playground()
             current_empty = sum(sum(current_playground == 0))
             current_succession = culculate_succession(current_playground)
 
             for direction in play.DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
-                assess_score.append(score_of_onestep)
-
-                assess_empty.append(sum(sum(next_playground == 0)) - current_empty)
-
-                next_succession = culculate_succession(next_playground)
-                assess_succession.append(next_succession - current_succession)
+                if np.all(next_playground == play.get_playground()):
+                    assess.append(-99999)
+                    continue
+                assess_score = score_of_onestep
+                assess_empty = sum(sum(next_playground == 0)) - current_empty
+                assess_succession = culculate_succession(next_playground) - current_succession
 
                 big_num_locs = list(np.argwhere(next_playground == np.max(next_playground)))
                 big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
                                         [(0, 0), (0, play.width - 1), (play.width - 1, 0),
                                          (play.width - 1, play.width - 1)]] for row, col
                                        in big_num_locs]
-                assess_corner.append(np.mean([max(t) for t in big_num_corner_diss]))
+                assess_corner = np.mean([max(t) for t in big_num_corner_diss])
 
-            assess = np.array(
-                [a * weights[0] + b * weights[1] + c * weights[2] + d * weights[3] for a, b, c, d in
-                 zip(assess_score, assess_empty, assess_succession, assess_corner)]
-            )
-
+                assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner])
+                assess.append(sum(assess_array * weights))
+            assess = np.array(assess)
             play.move(play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
             is_updated = True
         else:
@@ -364,7 +359,6 @@ def expectimax_algorithm(env, max_depth):
                                  (play.width - 1, play.width - 1)]] for row, col
                                in big_num_locs]
         assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-
         assess = assess_score + assess_empty + assess_succession + assess_corner
         return assess
 
@@ -384,7 +378,11 @@ def expectimax_algorithm(env, max_depth):
         if not play.is_terminal():
             assess = []
             for direction in play.DIRECTIONS:
-                result = search(play.fake_move(direction)[0], max_depth)
+                next_playground = play.fake_move(direction)[0]
+                if np.all(next_playground == play.get_playground()):
+                    assess.append(-99999)
+                    continue
+                result = search(next_playground, max_depth)
                 assess.append(result)
 
             assess = np.array(assess)
