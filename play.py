@@ -167,14 +167,14 @@ class Play2048:
             print('restart:')
             print(self.__playground)
 
-
 def update_env(play):
     screen.fill(WHITE)
     ground = play.get_playground()
     x_start = y_start = (WINDOW_WIDTH - WIDTH * WALL_WIDTH) / 2
     pygame.draw.rect(screen, BLACK, [y_start - 1, x_start - 1, WIDTH * WALL_WIDTH + 2, WIDTH * WALL_WIDTH + 2], 1)
 
-    map_text = pygame.font.SysFont('simsunnsimsun', int(y_start * 3 / 5)).render('得分：%4d' % play.get_score(), True, (106, 90, 205))
+    map_text = pygame.font.SysFont('simsunnsimsun', int(y_start * 3 / 5)).render('得分：%4d' % play.get_score(), True,
+                                                                                 (106, 90, 205))
     text_rect = map_text.get_rect()
     text_rect.center = (WINDOW_WIDTH / 2, y_start / 2)
     screen.blit(map_text, text_rect)
@@ -184,14 +184,14 @@ def update_env(play):
             y_pos = y_start + WALL_WIDTH * j
             if ground[i][j] != 0:
                 pygame.draw.rect(screen, YELLOW, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 0)
-                map_text = pygame.font.Font(None, int(WALL_WIDTH * 3 / 5)).render(str(ground[i][j]), True, (106, 90, 205))
+                map_text = pygame.font.Font(None, int(WALL_WIDTH * 3 / 5)).render(str(ground[i][j]), True,
+                                                                                  (106, 90, 205))
                 text_rect = map_text.get_rect()
                 text_rect.center = (y_pos + WALL_WIDTH / 2, x_pos + WALL_WIDTH / 2)
                 screen.blit(map_text, text_rect)
             pygame.draw.rect(screen, BLACK, [y_pos, x_pos, WALL_WIDTH, WALL_WIDTH], 1)
     if play.is_terminal():
         screen.blit(pygame.font.SysFont('simsunnsimsun', 100).render('按R重开', True, BLACK), (100, 100))
-
 
 def human_play(play):
     is_updated = True
@@ -217,6 +217,47 @@ def human_play(play):
         pygame.display.flip()
         pygame.event.pump()
 
+def culculate_succession(ground):
+    result = 0
+    if True:
+        for i in range(WIDTH):
+            for j in range(WIDTH - 1):
+                if ground[i][j] != 0:
+                    if ground[i][j] == ground[i][j + 1]:
+                        result += 1
+                if ground[j][i] != 0:
+                    if ground[j][i] == ground[j + 1][i]:
+                        result += 1
+    else:
+        tmps = []
+        for i in range(WIDTH):
+            tmp1 = []
+            tmp2 = []
+            for j in range(WIDTH):
+                if ground[i][j] != 0:
+                    tmp1.append(ground[i][j])
+                if ground[j][i] != 0:
+                    tmp2.append(ground[j][i])
+            tmps.append(tmp1)
+            tmps.append(tmp2)
+        for tmp in tmps:
+            if len(tmp) <= 1:
+                break
+            tip_l = 0
+            tip_r = 1
+            while True:
+                if tmp[tip_l] != tmp[tip_r]:
+                    tip_l += 1
+                    tip_r += 1
+                else:
+                    result += 1
+                    tip_l += 2
+                    tip_r += 2
+                if tip_l >= len(tmp) or tip_r >= len(tmp):
+                    break
+    return result
+
+
 
 def heuristic_algorithm(play, config):
     is_updated = True
@@ -234,34 +275,21 @@ def heuristic_algorithm(play, config):
         pygame.event.pump()
 
         if not play.is_terminal():
-            assess_score = []
-            assess_empty = []
-            assess_succession = []
-            assess_corner = []
+            assess_score = []  # 单步得分
+            assess_empty = []  # 空格增加数
+            assess_succession = []  # 连续相同对数
+            assess_corner = []  # 评估大数在角落的程度
             current_playground = play.get_playground()
             current_empty = len(list(np.argwhere(current_playground == 0)))
-            current_succession = 0
-            for i in range(WIDTH):
-                for j in range(WIDTH - 1):
-                    if current_playground[i][j] != 0:
-                        if current_playground[i][j] == current_playground[i][j + 1]:
-                            current_succession += 1
-                    if play.get_playground()[j][i] != 0:
-                        if current_playground[j][i] == current_playground[j + 1][i]:
-                            current_succession += 1
+            current_succession = culculate_succession(current_playground)
+
             for direction in DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
                 assess_score.append(score_of_onestep)
+
                 assess_empty.append(len(list(np.argwhere(next_playground == 0))) - current_empty)
-                next_succession = 0
-                for i in range(WIDTH):
-                    for j in range(WIDTH - 1):
-                        if next_playground[i][j] != 0:
-                            if next_playground[i][j] == next_playground[i][j + 1]:
-                                next_succession += 1
-                        if next_playground[j][i] != 0:
-                            if next_playground[j][i] == next_playground[j + 1][i]:
-                                next_succession += 1
+
+                next_succession = culculate_succession(next_playground)
                 assess_succession.append(next_succession - current_succession)
 
                 big_num_locs = list(np.argwhere(next_playground == np.max(next_playground)))
@@ -270,9 +298,11 @@ def heuristic_algorithm(play, config):
                                        in big_num_locs]
                 assess_corner.append(np.mean([max(t) for t in big_num_corner_diss]))
 
-            assess = np.array([a * config[0] + b * config[1] + c * config[2] + d * config[3] for a, b, c, d in
-                               zip(assess_score, assess_empty, assess_succession,
-                                   assess_corner)])
+            assess = np.array(
+                [a * config[0] + b * config[1] + c * config[2] + d * config[3] for a, b, c, d in
+                 zip(assess_score, assess_empty, assess_succession, assess_corner)]
+            )
+
             play.move(DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
             is_updated = True
             step += 1
@@ -287,15 +317,15 @@ def heuristic_algorithm(play, config):
             if episode >= MAX_EPISODE:
                 return scores
 
-
 def ai_play(play):
-    configs = [[1, 0, 0, 0],
-               [0, 1, 0, 0],
-               [0, 0, 1, 0],
-               [0, 0, 0, 1],
-               [1, 1, 0, 0],
-               [1, 1, 1, 0],
-               [1, 1, 1, 1]]
+    configs = []
+    # configs.append([1, 0, 0, 0])
+    # configs.append([0, 1, 0, 0])
+    # configs.append([0, 0, 1, 0])
+    # configs.append([0, 0, 0, 1])
+    # configs.append([1, 1, 0, 0])
+    # configs.append([1, 1, 1, 0])
+    configs.append([1, 1, 1, 1])
     name_list = [''.join(str(x) for x in config) for config in configs]
     min_list = []
     max_list = []
@@ -304,10 +334,15 @@ def ai_play(play):
     x = list(range(len(configs)))
     for config in configs:
         scores = heuristic_algorithm(play, config)
-        min_list.append(np.min(scores))
-        max_list.append(np.max(scores))
-        mean_list.append(np.mean(scores))
-        var_list.append(np.var(scores))
+        min = np.min(scores)
+        max = np.max(scores)
+        mean = np.mean(scores)
+        min_list.append(min)
+        max_list.append(max)
+        mean_list.append(mean)
+        var_list.append(
+            np.std((np.array(scores) - min) / (max - min))
+        )
 
     plt.subplot(221)
     plt.title('min')
@@ -327,14 +362,10 @@ def ai_play(play):
 
     plt.show()
 
-
-
 def main():
     play = Play2048(WIDTH, debug=False)
     # human_play(play)
     ai_play(play)
-
-
 
 if __name__ == '__main__':
     main()
