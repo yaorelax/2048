@@ -185,7 +185,7 @@ def human_play(env):
     is_updated = True
     while True:
         if is_updated:
-            env.update_env(play)
+            env.update_env()
             is_updated = False
         for event in pygame.event.get():
             if event.type == QUIT:

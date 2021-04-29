@@ -127,6 +127,7 @@ class Play2048:
             return
         move_success = True
         score = 0
+        current_playground_backup = [[x for x in row] for row in self.__playground]
         if direction == 'left':
             ground = self.__playground
             score = self.__realize_slide(ground)
@@ -142,6 +143,8 @@ class Play2048:
         else:
             move_success = False
             print('Direction error!')
+        if np.all(current_playground_backup == self.__playground):
+            move_success = False
         if move_success:
             self.__score += score
             if self.__debug:
@@ -194,7 +197,7 @@ def human_play(env):
     is_updated = True
     while True:
         if is_updated:
-            env.update_env(play)
+            env.update_env()
             is_updated = False
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -310,6 +313,11 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
 def expectimax_algorithm(env, max_depth):
     play = env.play
 
+    class Brain:
+        def __init__(self, max_memory):
+            self.memory = []
+            self.max_memory = max_memory
+
     def search(ground, depth, move=False):
         if depth == 0 or (move and play.is_terminal()):
             return heuristic(ground)
@@ -317,6 +325,8 @@ def expectimax_algorithm(env, max_depth):
         if move:
             for direction in play.DIRECTIONS:
                 child = play.fake_move(direction, ground)[0]
+                if np.all(child == ground):
+                    continue
                 alpha = max(alpha, search(child, depth - 1))
         else:
             alpha = 0
@@ -413,12 +423,11 @@ def expectimax_algorithm(env, max_depth):
 def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
-    # configs.append((heuristic_algorithm, [1, 1, 1, 1]))
     # configs.append((heuristic_algorithm, [4, 3, 3, 1]))
-    configs.append((heuristic_algorithm, [5, 4, 3, 1]))
+    # configs.append((heuristic_algorithm, [5, 4, 3, 1]))
     # configs.append((heuristic_algorithm, [10, 4, 3, 1]))
     # max_depth
-    # configs.append((expectimax_algorithm, 2))
+    configs.append((expectimax_algorithm, 4))
     name_list = [(''.join(str(x) for x in config[1])
                   if type(config[1]) is list
                   else str(config[1]))
@@ -460,7 +469,7 @@ def ai_play(env):
 def main():
     play = Play2048(width=4, debug=False)
     env = ENV(play)
-    # human_play(env)
+    human_play(env)
     ai_play(env)
 
 if __name__ == '__main__':
