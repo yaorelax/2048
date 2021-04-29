@@ -5,6 +5,7 @@ import random
 import time
 import matplotlib.pyplot as plt
 from pygame.locals import *
+from collections import OrderedDict
 
 MAX_EPISODE = 50
 
@@ -64,6 +65,7 @@ class Play2048:
         self.__score = 0
         self.__init_playground()
         self.__random_generate()
+        self.__random_generate()
         if self.__debug:
             print('init:(%s * %s)' % (width, width))
             print(self.__playground)
@@ -82,6 +84,13 @@ class Play2048:
             self.__playground[row][col] = 2 if np.random.rand() < 0.9 else 4
             if self.__debug:
                 print('generate:', self.__playground[row][col])
+        if len(empty_list) == 1:
+            is_terminal = True
+            for direction in self.DIRECTIONS:
+                if len(list(np.argwhere(self.fake_move(direction) == 0))) != 0:
+                    is_terminal = False
+                    break
+            self.__terminal = is_terminal
 
     def __realize_slide(self, ground):
         score = 0
@@ -156,19 +165,19 @@ class Play2048:
     def fake_move(self, direction, current_playground=None):
         if current_playground is None:
             current_playground = self.__playground
-        next_playground = None
+        next_playground = np.array([[x for x in row] for row in current_playground])
         score = 0
         if direction == 'left':
-            next_playground = ground = np.array([[x for x in row] for row in current_playground])
+            ground = next_playground
             score = self.__realize_slide(ground)
         elif direction == 'right':
-            next_playground = ground = np.array([[x for x in row] for row in np.flip(current_playground, axis=1)])
+            ground = np.flip(next_playground, axis=1)
             score = self.__realize_slide(ground)
         elif direction == 'up':
-            next_playground = ground = np.array([[x for x in row] for row in current_playground.T])
+            ground = next_playground.T
             score = self.__realize_slide(ground)
         elif direction == 'down':
-            next_playground = ground = np.array([[x for x in row] for row in np.flip(current_playground, axis=0).T])
+            ground = np.flip(next_playground, axis=0).T
             score = self.__realize_slide(ground)
         else:
             print('Direction error!')
@@ -178,6 +187,7 @@ class Play2048:
         self.__terminal = False
         self.__score = 0
         self.__init_playground()
+        self.__random_generate()
         self.__random_generate()
         if self.__debug:
             print('restart:')
@@ -264,6 +274,7 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
     is_updated = True
     episode = 0
     scores = []
+    step = 0
     while True:
         if is_updated:
             env.update_env()
@@ -283,7 +294,7 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             for direction in play.DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
                 if np.all(next_playground == play.get_playground()):
-                    assess.append(-99999)
+                    assess.append(-99999999)
                     continue
                 assess_score = score_of_onestep
                 assess_empty = sum(sum(next_playground == 0)) - current_empty
@@ -301,10 +312,12 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             assess = np.array(assess)
             play.move(play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
             is_updated = True
+            step += 1
         else:
-            print('[%s]episode:%3d score:%4d' % (''.join(str(x) for x in weights), episode, play.get_score()))
+            print('[%s]episode:%3d score:%4d' % (''.join(str(x) for x in weights), episode, play.get_score()), 'step:', step)
             scores.append(play.get_score())
             episode += 1
+            step = 0
             play.restart()
             if episode >= MAX_EPISODE:
                 return scores
@@ -315,8 +328,20 @@ def expectimax_algorithm(env, max_depth):
 
     class Brain:
         def __init__(self, max_memory):
-            self.memory = []
-            self.max_memory = max_memory
+            self.__memory = OrderedDict()
+            self.__max_memory = max_memory
+
+        def remember(self, something, value):
+            if something not in self.__memory:
+                if len(self.__memory) == self.__max_memory:
+                    del self.__memory[next(iter(self.__memory))]
+                self.__memory[something] = value
+
+        def recall(self, something):
+            if something in self.__memory:
+                return self.__memory[something]
+            else:
+                return None
 
     def search(ground, depth, move=False):
         if depth == 0 or (move and play.is_terminal()):
@@ -327,7 +352,15 @@ def expectimax_algorithm(env, max_depth):
                 child = play.fake_move(direction, ground)[0]
                 if np.all(child == ground):
                     continue
-                alpha = max(alpha, search(child, depth - 1))
+                # with memory
+                alpha_ = brain.recall(hash(str((child, depth - 1))))
+                if alpha_ is None:
+                    alpha_ = search(child, depth - 1)
+                    brain.remember(hash(str((child, depth - 1))), alpha_)
+                alpha = max(alpha, alpha_)
+
+                # without memory
+                # alpha = max(alpha, search(child, depth - 1))
         else:
             alpha = 0
             zeros = [(i, j) for i, j in list(np.argwhere(ground == 0))]
@@ -382,11 +415,17 @@ def expectimax_algorithm(env, max_depth):
                                  (play.width - 1, play.width - 1)]] for row, col
                                in big_num_locs]
         assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-        assess = assess_score + assess_empty + assess_succession + assess_corner
+        assess = \
+            5 * assess_score + \
+            4 * assess_empty + \
+            3 * assess_succession + \
+            1 * assess_corner
         return assess
 
+    brain = Brain(1000)
     is_updated = True
     episode = 0
+    step = 0
     scores = []
     while True:
         if is_updated:
@@ -403,19 +442,21 @@ def expectimax_algorithm(env, max_depth):
             for direction in play.DIRECTIONS:
                 next_playground = play.fake_move(direction)[0]
                 if np.all(next_playground == play.get_playground()):
-                    assess.append(-99999)
+                    assess.append(-99999999)
                     continue
                 result = search(next_playground, max_depth)
                 assess.append(result)
 
             assess = np.array(assess)
-
-            play.move(play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
+            direction = play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])]
+            play.move(direction)
             is_updated = True
+            step += 1
         else:
-            print('[%s]episode:%3d score:%4d' % ('expectimax', episode, play.get_score()))
+            print('[%s]episode:%3d score:%4d' % ('expectimax', episode, play.get_score()), 'step:', step)
             scores.append(play.get_score())
             episode += 1
+            step = 0
             play.restart()
             if episode >= MAX_EPISODE:
                 return scores
@@ -424,13 +465,13 @@ def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
     # configs.append((heuristic_algorithm, [4, 3, 3, 1]))
-    # configs.append((heuristic_algorithm, [5, 4, 3, 1]))
+    configs.append((heuristic_algorithm, [5, 4, 3, 1]))
     # configs.append((heuristic_algorithm, [10, 4, 3, 1]))
     # max_depth
     configs.append((expectimax_algorithm, 4))
-    name_list = [(''.join(str(x) for x in config[1])
+    name_list = [('H' + (''.join(str(x) for x in config[1]))
                   if type(config[1]) is list
-                  else str(config[1]))
+                  else ('E' + str(config[1])))
                  for config in configs]
     min_list = []
     max_list = []
@@ -469,7 +510,7 @@ def ai_play(env):
 def main():
     play = Play2048(width=4, debug=False)
     env = ENV(play)
-    human_play(env)
+    # human_play(env)
     ai_play(env)
 
 if __name__ == '__main__':
