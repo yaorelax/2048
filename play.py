@@ -6,7 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from pygame.locals import *
 
-MAX_EPISODE = 10
+MAX_EPISODE = 50
 
 class ENV:
     WHITE = (255, 255, 255)
@@ -413,29 +413,31 @@ def expectimax_algorithm(env, max_depth):
 def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
-    configs.append((heuristic_algorithm, [1, 1, 1, 1]))
-    configs.append((heuristic_algorithm, [4, 3, 3, 1]))
+    # configs.append((heuristic_algorithm, [1, 1, 1, 1]))
+    # configs.append((heuristic_algorithm, [4, 3, 3, 1]))
     configs.append((heuristic_algorithm, [5, 4, 3, 1]))
-    configs.append((heuristic_algorithm, [10, 4, 3, 1]))
+    # configs.append((heuristic_algorithm, [10, 4, 3, 1]))
     # max_depth
-    configs.append((expectimax_algorithm, 4))
-    name_list = [''.join(str(x) for x in config) for _, config in configs]
+    # configs.append((expectimax_algorithm, 2))
+    name_list = [(''.join(str(x) for x in config[1])
+                  if type(config[1]) is list
+                  else str(config[1]))
+                 for config in configs]
     min_list = []
     max_list = []
     mean_list = []
-    var_list = []
+    cv_list = []
     x = list(range(len(configs)))
     for algorithm, config in configs:
         scores = algorithm(env, config)
         min = np.min(scores)
         max = np.max(scores)
         mean = np.mean(scores)
+        std = np.std(scores)
         min_list.append(min)
         max_list.append(max)
         mean_list.append(mean)
-        var_list.append(
-            np.std((np.array(scores) - min) / (max - min))
-        )
+        cv_list.append(std / min)
 
     plt.subplot(221)
     plt.title('min')
@@ -450,8 +452,8 @@ def ai_play(env):
     plt.bar(x, mean_list, tick_label=name_list)
 
     plt.subplot(224)
-    plt.title('var')
-    plt.bar(x, var_list, tick_label=name_list)
+    plt.title('cv')
+    plt.bar(x, cv_list, tick_label=name_list)
 
     plt.show()
 
