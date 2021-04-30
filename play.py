@@ -129,7 +129,7 @@ class Play2048:
     def is_terminal(self):
         return self.__terminal
 
-    def heuristic(self, ground):
+    def heuristic1(self, ground):
         def score(ground):
             weight = [[pow(4, 2 * self.width - 2 - i - j) for j in range(self.width)] for i in range(self.width)]
             sco = sum(sum(np.array(weight) * np.array(ground)))
@@ -208,7 +208,7 @@ class Play2048:
         assess = sum(assess_array * weights)
         return assess
 
-    def heuristic2(self, ground):
+    def heuristic(self, ground):
         def culculate_succession(ground):
             result = 0
             if True:
@@ -249,7 +249,7 @@ class Play2048:
                             break
             return result
 
-        assess_score = np.log2(np.sum(ground))
+        assess_score = self.get_score()
         assess_empty = sum(sum(ground == 0))
         assess_succession = culculate_succession(ground)
         big_num_locs = list(np.argwhere(ground == np.max(ground)))
@@ -259,7 +259,7 @@ class Play2048:
                                in big_num_locs]
         assess_corner = np.mean([max(t) for t in big_num_corner_diss])
         assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner])
-        weights = [1, 2, 1, 4]
+        weights = [1, 1, 1, 1]
         assess = sum(assess_array * weights)
         return assess
 
