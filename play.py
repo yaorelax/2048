@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from pygame.locals import *
 from collections import OrderedDict
 
-MAX_EPISODE = 50
+MAX_EPISODE = 10
 
 class ENV:
     WHITE = (255, 255, 255)
@@ -130,34 +130,33 @@ class Play2048:
         return self.__terminal
 
     def heuristic(self, ground):
-        # 第一种方法
-        # def score(ground):
-        #     weight = [[pow(4, 2 * self.width - 2 - i - j) for j in range(self.width)] for i in range(self.width)]
-        #     sco = sum(sum(np.array(weight) * np.array(ground)))
-        #     return sco
-        #
-        # def penalty(ground):
-        #     pen = 0
-        #     for i in range(0, 4):
-        #         for j in range(0, 4):
-        #             if i - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i - 1][j])
-        #             if i + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i + 1][j])
-        #             if j - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i][j - 1])
-        #             if j + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i][j + 1])
-        #     pen2 = sum(sum(ground == 0))
-        #     return pen - 2 * pen2
-        #
-        # return score(ground) - penalty(ground)
+        def score(ground):
+            weight = [[pow(4, 2 * self.width - 2 - i - j) for j in range(self.width)] for i in range(self.width)]
+            sco = sum(sum(np.array(weight) * np.array(ground)))
+            return sco
+
+        def penalty(ground):
+            pen = 0
+            for i in range(0, 4):
+                for j in range(0, 4):
+                    if i - 1 >= 0:
+                        pen += abs(ground[i][j] - ground[i - 1][j])
+                    if i + 1 < 4:
+                        pen += abs(ground[i][j] - ground[i + 1][j])
+                    if j - 1 >= 0:
+                        pen += abs(ground[i][j] - ground[i][j - 1])
+                    if j + 1 < 4:
+                        pen += abs(ground[i][j] - ground[i][j + 1])
+            pen2 = sum(sum(ground == 0))
+            return pen - 2 * pen2
+
+        return score(ground) - penalty(ground)
 
 
         # 第二种方法
         def culculate_succession(ground):
             result = 0
-            if False:
+            if True:
                 for i in range(self.width):
                     for j in range(self.width - 1):
                         if ground[i][j] != 0:
@@ -188,14 +187,14 @@ class Play2048:
                             tip_l += 1
                             tip_r += 1
                         else:
-                            result += 1
+                            result += np.log2(tmp[tip_l])
                             tip_l += 2
                             tip_r += 2
                         if tip_l >= len(tmp) or tip_r >= len(tmp):
                             break
             return result
 
-        assess_score = np.log2(self.get_score())
+        assess_score = np.log2(np.sum(ground))
         assess_empty = sum(sum(ground == 0))
         assess_succession = culculate_succession(ground)
         big_num_locs = list(np.argwhere(ground == np.max(ground)))
@@ -204,12 +203,244 @@ class Play2048:
                                  (self.width - 1, self.width - 1)]] for row, col
                                in big_num_locs]
         assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-        assess_max_block = np.log2(np.max(ground))
-        assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner, assess_max_block])
-        print(assess_array)
-        weights = [1, 2, 2, 4, 1]
+        assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner])
+        weights = [1, 2, 1, 4]
         assess = sum(assess_array * weights)
         return assess
+
+    def heuristic2(self, ground):
+        def culculate_succession(ground):
+            result = 0
+            if True:
+                for i in range(self.width):
+                    for j in range(self.width - 1):
+                        if ground[i][j] != 0:
+                            if ground[i][j] == ground[i][j + 1]:
+                                result += 1
+                        if ground[j][i] != 0:
+                            if ground[j][i] == ground[j + 1][i]:
+                                result += 1
+            else:
+                tmps = []
+                for i in range(self.width):
+                    tmp1 = []
+                    tmp2 = []
+                    for j in range(self.width):
+                        if ground[i][j] != 0:
+                            tmp1.append(ground[i][j])
+                        if ground[j][i] != 0:
+                            tmp2.append(ground[j][i])
+                    tmps.append(tmp1)
+                    tmps.append(tmp2)
+                for tmp in tmps:
+                    if len(tmp) <= 1:
+                        break
+                    tip_l = 0
+                    tip_r = 1
+                    while True:
+                        if tmp[tip_l] != tmp[tip_r]:
+                            tip_l += 1
+                            tip_r += 1
+                        else:
+                            result += np.log2(tmp[tip_l])
+                            tip_l += 2
+                            tip_r += 2
+                        if tip_l >= len(tmp) or tip_r >= len(tmp):
+                            break
+            return result
+
+        assess_score = np.log2(np.sum(ground))
+        assess_empty = sum(sum(ground == 0))
+        assess_succession = culculate_succession(ground)
+        big_num_locs = list(np.argwhere(ground == np.max(ground)))
+        big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
+                                [(0, 0), (0, self.width - 1), (self.width - 1, 0),
+                                 (self.width - 1, self.width - 1)]] for row, col
+                               in big_num_locs]
+        assess_corner = np.mean([max(t) for t in big_num_corner_diss])
+        assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner])
+        weights = [1, 2, 1, 4]
+        assess = sum(assess_array * weights)
+        return assess
+
+    def heuristic3(self, ground, commonRatio=0.25):
+        linearWeightedVal = 0
+        invert = False
+        weight = 1.
+        malus = 0
+        criticalTile = (-1, -1)
+        for y in range(self.width):
+            for x in range(self.width):
+                b_x = x
+                b_y = y
+                if invert:
+                    b_x = self.width - 1 - x
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile == (-1, -1):
+                    criticalTile = (b_x, b_y)
+                linearWeightedVal += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal2 = 0
+        invert = False
+        weight = 1.
+        malus = 0
+        criticalTile2 = (-1, -1)
+        for x in range(self.width):
+            for y in range(self.width):
+                b_x = x
+                b_y = y
+                if invert:
+                    b_y = self.width - 1 - y
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile2 == (-1, -1):
+                    criticalTile2 = (b_x, b_y)
+                linearWeightedVal2 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal3 = 0
+        invert = False
+        weight = 1.
+        malus = 0
+        criticalTile3 = (-1, -1)
+        for y in range(self.width):
+            for x in range(self.width):
+                b_x = x
+                b_y = self.width - 1 - y
+                if invert:
+                    b_x = self.width - 1 - x
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile3 == (-1, -1):
+                    criticalTile3 = (b_x, b_y)
+                linearWeightedVal3 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal4 = 0
+        invert = False
+        weight = 1.
+        malus = 0
+        criticalTile4 = (-1, -1)
+        for x in range(self.width):
+            for y in range(self.width):
+                b_x = self.width - 1 - x
+                b_y = y
+                if invert:
+                    b_y = self.width - 1 - y
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile4 == (-1, -1):
+                    criticalTile4 = (b_x, b_y)
+                linearWeightedVal4 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal5 = 0
+        invert = True
+        weight = 1.
+        malus = 0
+        criticalTile5 = (-1, -1)
+        for y in range(self.width):
+            for x in range(self.width):
+                b_x = x
+                b_y = y
+                if invert:
+                    b_x = self.width - 1 - x
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile5 == (-1, -1):
+                    criticalTile5 = (b_x, b_y)
+                linearWeightedVal5 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal6 = 0
+        invert = True
+        weight = 1.
+        malus = 0
+        criticalTile6 = (-1, -1)
+        for x in range(self.width):
+            for y in range(self.width):
+                b_x = x
+                b_y = y
+                if invert:
+                    b_y = self.width - 1 - y
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile6 == (-1, -1):
+                    criticalTile6 = (b_x, b_y)
+                linearWeightedVal6 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal7 = 0
+        invert = True
+        weight = 1.
+        malus = 0
+        criticalTile7 = (-1, -1)
+        for y in range(self.width):
+            for x in range(self.width):
+                b_x = x
+                b_y = self.width - 1 - y
+                if invert:
+                    b_x = self.width - 1 - x
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile7 == (-1, -1):
+                    criticalTile7 = (b_x, b_y)
+                linearWeightedVal7 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        linearWeightedVal8 = 0
+        invert = True
+        weight = 1.
+        malus = 0
+        criticalTile8 = (-1, -1)
+        for x in range(self.width):
+            for y in range(self.width):
+                b_x = self.width - 1 - x
+                b_y = y
+                if invert:
+                    b_y = self.width - 1 - y
+                # linearW
+                currVal = ground[b_x, b_y]
+                if currVal == 0 and criticalTile8 == (-1, -1):
+                    criticalTile8 = (b_x, b_y)
+                linearWeightedVal8 += currVal * weight
+                weight *= commonRatio
+            invert = not invert
+
+        maxVal = max(linearWeightedVal, linearWeightedVal2, linearWeightedVal3, linearWeightedVal4, linearWeightedVal5,
+                     linearWeightedVal6, linearWeightedVal7, linearWeightedVal8)
+        if linearWeightedVal2 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal2
+            criticalTile = criticalTile2
+        if linearWeightedVal3 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal3
+            criticalTile = criticalTile3
+        if linearWeightedVal4 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal4
+            criticalTile = criticalTile4
+        if linearWeightedVal5 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal5
+            criticalTile = criticalTile5
+        if linearWeightedVal6 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal6
+            criticalTile = criticalTile6
+        if linearWeightedVal7 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal7
+            criticalTile = criticalTile7
+        if linearWeightedVal8 > linearWeightedVal:
+            linearWeightedVal = linearWeightedVal8
+            criticalTile = criticalTile8
+
+        return maxVal
 
     def move(self, direction):
         if self.__terminal:
@@ -411,6 +642,50 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             if episode >= MAX_EPISODE:
                 return scores
 
+def heuristic_algorithm_with_one_step_heuristic(env, x=None):  # assess_score assess_empty assess_succession assess_corner
+    play = env.play
+    is_updated = True
+    episode = 0
+    scores = []
+    step = 0
+    while True:
+        if is_updated:
+            env.update_env()
+            is_updated = False
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                sys.exit()
+        pygame.display.flip()
+        pygame.event.pump()
+
+        if not play.is_terminal():
+            assess = []
+            for direction in play.DIRECTIONS:
+                next_playground, score_of_onestep = play.fake_move(direction)
+                if np.all(next_playground == play.get_playground()):
+                    assess.append(-99999999)
+                    continue
+                assess.append(play.heuristic(next_playground))
+            assess = np.array(assess)
+            play.move(play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])])
+            is_updated = True
+            step += 1
+        else:
+            print('[%s]episode:%3d score:%4d step:%3d max_block:%4d'
+                  % ('heuristic__one_step',
+                     episode,
+                     play.get_score(),
+                     step,
+                     np.max(play.get_playground())
+                     )
+                  )
+            scores.append(play.get_score())
+            episode += 1
+            step = 0
+            play.restart()
+            if episode >= MAX_EPISODE:
+                return scores
+
 @coast_time
 def expectimax_algorithm(env, max_depth):
     play = env.play
@@ -519,6 +794,7 @@ def ai_play(env):
     # max_depth
 
     configs.append((expectimax_algorithm, 4))
+    # configs.append((heuristic_algorithm_with_one_step_heuristic, ['one']))
     name_list = [('H' + (''.join(str(x) for x in config[1]))
                   if type(config[1]) is list
                   else ('E' + str(config[1])))
