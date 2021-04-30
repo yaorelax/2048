@@ -129,6 +129,88 @@ class Play2048:
     def is_terminal(self):
         return self.__terminal
 
+    def heuristic(self, ground):
+        # 第一种方法
+        # def score(ground):
+        #     weight = [[pow(4, 2 * self.width - 2 - i - j) for j in range(self.width)] for i in range(self.width)]
+        #     sco = sum(sum(np.array(weight) * np.array(ground)))
+        #     return sco
+        #
+        # def penalty(ground):
+        #     pen = 0
+        #     for i in range(0, 4):
+        #         for j in range(0, 4):
+        #             if i - 1 >= 0:
+        #                 pen += abs(ground[i][j] - ground[i - 1][j])
+        #             if i + 1 < 4:
+        #                 pen += abs(ground[i][j] - ground[i + 1][j])
+        #             if j - 1 >= 0:
+        #                 pen += abs(ground[i][j] - ground[i][j - 1])
+        #             if j + 1 < 4:
+        #                 pen += abs(ground[i][j] - ground[i][j + 1])
+        #     pen2 = sum(sum(ground == 0))
+        #     return pen - 2 * pen2
+        #
+        # return score(ground) - penalty(ground)
+
+
+        # 第二种方法
+        def culculate_succession(ground):
+            result = 0
+            if False:
+                for i in range(self.width):
+                    for j in range(self.width - 1):
+                        if ground[i][j] != 0:
+                            if ground[i][j] == ground[i][j + 1]:
+                                result += 1
+                        if ground[j][i] != 0:
+                            if ground[j][i] == ground[j + 1][i]:
+                                result += 1
+            else:
+                tmps = []
+                for i in range(self.width):
+                    tmp1 = []
+                    tmp2 = []
+                    for j in range(self.width):
+                        if ground[i][j] != 0:
+                            tmp1.append(ground[i][j])
+                        if ground[j][i] != 0:
+                            tmp2.append(ground[j][i])
+                    tmps.append(tmp1)
+                    tmps.append(tmp2)
+                for tmp in tmps:
+                    if len(tmp) <= 1:
+                        break
+                    tip_l = 0
+                    tip_r = 1
+                    while True:
+                        if tmp[tip_l] != tmp[tip_r]:
+                            tip_l += 1
+                            tip_r += 1
+                        else:
+                            result += 1
+                            tip_l += 2
+                            tip_r += 2
+                        if tip_l >= len(tmp) or tip_r >= len(tmp):
+                            break
+            return result
+
+        assess_score = np.log2(self.get_score())
+        assess_empty = sum(sum(ground == 0))
+        assess_succession = culculate_succession(ground)
+        big_num_locs = list(np.argwhere(ground == np.max(ground)))
+        big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
+                                [(0, 0), (0, self.width - 1), (self.width - 1, 0),
+                                 (self.width - 1, self.width - 1)]] for row, col
+                               in big_num_locs]
+        assess_corner = np.mean([max(t) for t in big_num_corner_diss])
+        assess_max_block = np.log2(np.max(ground))
+        assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner, assess_max_block])
+        print(assess_array)
+        weights = [1, 2, 2, 4, 1]
+        assess = sum(assess_array * weights)
+        return assess
+
     def move(self, direction):
         if self.__terminal:
             if self.__debug:
@@ -290,7 +372,6 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             current_playground = play.get_playground()
             current_empty = sum(sum(current_playground == 0))
             current_succession = culculate_succession(current_playground)
-
             for direction in play.DIRECTIONS:
                 next_playground, score_of_onestep = play.fake_move(direction)
                 if np.all(next_playground == play.get_playground()):
@@ -315,7 +396,7 @@ def heuristic_algorithm(env, weights):  # assess_score assess_empty assess_succe
             step += 1
         else:
             print('[%s%s]episode:%3d score:%4d step:%3d max_block:%4d'
-                  % ('expectimax',
+                  % ('heuristic',
                      ''.join(str(x) for x in weights),
                      episode,
                      play.get_score(),
@@ -353,9 +434,9 @@ def expectimax_algorithm(env, max_depth):
 
     def search(ground, depth, move=False):
         if depth == 0 or (move and play.is_terminal()):
-            return heuristic(ground)
+            return play.heuristic(ground)
         if move:
-            alpha = heuristic(ground)
+            alpha = play.heuristic(ground)
             for direction in play.DIRECTIONS:
                 child = play.fake_move(direction, ground)[0]
                 if np.all(child == ground):
@@ -381,56 +462,9 @@ def expectimax_algorithm(env, max_depth):
                           .1 * search(c2, depth - 1, True) / len(zeros))
         return alpha
 
-    def heuristic(ground):
-        # def score(ground):
-        #     weight = [[pow(4, 2 * play.width - 2 - i - j) for j in range(play.width)] for i in range(play.width)]
-        #     sco = sum(sum(np.array(weight) * np.array(ground)))
-        #     return sco
-        #
-        # def penalty(ground):
-        #     pen = 0
-        #     for i in range(0, 4):
-        #         for j in range(0, 4):
-        #             if i - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i - 1][j])
-        #             if i + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i + 1][j])
-        #             if j - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i][j - 1])
-        #             if j + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i][j + 1])
-        #     pen2 = sum(sum(ground == 0))
-        #     return pen - 2 * pen2
-        # return score(ground) - penalty(ground)
-        def culculate_succession(ground):
-            result = 0
-            for i in range(play.width):
-                for j in range(play.width - 1):
-                    if ground[i][j] != 0:
-                        if ground[i][j] == ground[i][j + 1]:
-                            result += 1
-                    if ground[j][i] != 0:
-                        if ground[j][i] == ground[j + 1][i]:
-                            result += 1
-            return result
 
-        assess_score = play.get_score()
-        assess_empty = sum(sum(ground == 0))
-        assess_succession = culculate_succession(ground)
-        big_num_locs = list(np.argwhere(ground == np.max(ground)))
-        big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
-                                [(0, 0), (0, play.width - 1), (play.width - 1, 0),
-                                 (play.width - 1, play.width - 1)]] for row, col
-                               in big_num_locs]
-        assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-        assess = \
-            5 * assess_score + \
-            4 * assess_empty + \
-            3 * assess_succession + \
-            1 * assess_corner
-        return assess
 
-    brain = Brain(1000)
+    brain = Brain(10000)
     is_updated = True
     episode = 0
     step = 0
@@ -475,158 +509,15 @@ def expectimax_algorithm(env, max_depth):
             if episode >= MAX_EPISODE:
                 return scores
 
-@coast_time
-def minimax_algorithm(env, max_depth):
-    play = env.play
-
-    class Brain:
-        def __init__(self, max_memory):
-            self.__memory = OrderedDict()
-            self.__max_memory = max_memory
-
-        def remember(self, something, value):
-            if something not in self.__memory:
-                if len(self.__memory) == self.__max_memory:
-                    del self.__memory[next(iter(self.__memory))]
-                self.__memory[something] = value
-
-        def recall(self, something):
-            if something in self.__memory:
-                return self.__memory[something]
-            else:
-                return None
-
-    def search(ground, depth, move=False):
-        if depth == 0 or (move and play.is_terminal()):
-            return heuristic(ground)
-        if move:
-            alpha = heuristic(ground)
-            for direction in play.DIRECTIONS:
-                child = play.fake_move(direction, ground)[0]
-                if np.all(child == ground):
-                    continue
-                # with memory
-                alpha_ = brain.recall(hash(str((child, depth - 1))))
-                if alpha_ is None:
-                    alpha_ = search(child, depth - 1)
-                    brain.remember(hash(str((child, depth - 1))), alpha_)
-                alpha = max(alpha, alpha_)
-
-                # without memory
-                # alpha = max(alpha, search(child, depth - 1))
-        else:
-            alpha = 99999999
-            zeros = [(i, j) for i, j in list(np.argwhere(ground == 0))]
-            for i, j in zeros:
-                c1 = np.array([[x for x in row] for row in ground])
-                c2 = np.array([[x for x in row] for row in ground])
-                c1[i][j] = 2
-                c2[i][j] = 4
-                alpha = min(alpha, search(c1, depth - 1, True) / len(zeros), search(c2, depth - 1, True) / len(zeros))
-        return alpha
-
-    def heuristic(ground):
-        # def score(ground):
-        #     weight = [[pow(4, 2 * play.width - 2 - i - j) for j in range(play.width)] for i in range(play.width)]
-        #     sco = sum(sum(np.array(weight) * np.array(ground)))
-        #     return sco
-        #
-        # def penalty(ground):
-        #     pen = 0
-        #     for i in range(0, 4):
-        #         for j in range(0, 4):
-        #             if i - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i - 1][j])
-        #             if i + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i + 1][j])
-        #             if j - 1 >= 0:
-        #                 pen += abs(ground[i][j] - ground[i][j - 1])
-        #             if j + 1 < 4:
-        #                 pen += abs(ground[i][j] - ground[i][j + 1])
-        #     pen2 = sum(sum(ground == 0))
-        #     return pen - 2 * pen2
-        # return score(ground) - penalty(ground)
-        def culculate_succession(ground):
-            result = 0
-            for i in range(play.width):
-                for j in range(play.width - 1):
-                    if ground[i][j] != 0:
-                        if ground[i][j] == ground[i][j + 1]:
-                            result += 1
-                    if ground[j][i] != 0:
-                        if ground[j][i] == ground[j + 1][i]:
-                            result += 1
-            return result
-
-        assess_score = play.get_score()
-        assess_empty = sum(sum(ground == 0))
-        assess_succession = culculate_succession(ground)
-        big_num_locs = list(np.argwhere(ground == np.max(ground)))
-        big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
-                                [(0, 0), (0, play.width - 1), (play.width - 1, 0),
-                                 (play.width - 1, play.width - 1)]] for row, col
-                               in big_num_locs]
-        assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-        assess = \
-            5 * assess_score + \
-            4 * assess_empty + \
-            3 * assess_succession + \
-            1 * assess_corner
-        return assess
-
-    brain = Brain(1000)
-    is_updated = True
-    episode = 0
-    step = 0
-    scores = []
-    while True:
-        if is_updated:
-            env.update_env()
-            is_updated = False
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                sys.exit()
-        pygame.display.flip()
-        pygame.event.pump()
-
-        if not play.is_terminal():
-            assess = []
-            for direction in play.DIRECTIONS:
-                next_playground = play.fake_move(direction)[0]
-                if np.all(next_playground == play.get_playground()):
-                    assess.append(-99999999)
-                    continue
-                result = search(next_playground, max_depth)
-                assess.append(result)
-
-            assess = np.array(assess)
-            direction = play.DIRECTIONS[random.choice(np.where(assess == max(assess))[0])]
-            play.move(direction)
-            is_updated = True
-            step += 1
-        else:
-            print('[%s%s]episode:%3d score:%4d step:%3d max_block:%4d'
-                  % ('minimax',
-                     max_depth,
-                     episode,
-                     play.get_score(),
-                     step,
-                     np.max(play.get_playground())))
-            scores.append(play.get_score())
-            episode += 1
-            step = 0
-            play.restart()
-            if episode >= MAX_EPISODE:
-                return scores
-
 def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
+    # configs.append((heuristic_algorithm, [1, 1, 1, 1]))
     # configs.append((heuristic_algorithm, [4, 3, 3, 1]))
     # configs.append((heuristic_algorithm, [5, 4, 3, 1]))
     # configs.append((heuristic_algorithm, [10, 4, 3, 1]))
     # max_depth
-    configs.append((minimax_algorithm, 4))
+
     configs.append((expectimax_algorithm, 4))
     name_list = [('H' + (''.join(str(x) for x in config[1]))
                   if type(config[1]) is list
