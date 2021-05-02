@@ -152,62 +152,6 @@ class Play2048:
 
         return score(ground) - penalty(ground)
 
-
-        # 第二种方法
-        def culculate_succession(ground):
-            result = 0
-            if True:
-                for i in range(self.width):
-                    for j in range(self.width - 1):
-                        if ground[i][j] != 0:
-                            if ground[i][j] == ground[i][j + 1]:
-                                result += 1
-                        if ground[j][i] != 0:
-                            if ground[j][i] == ground[j + 1][i]:
-                                result += 1
-            else:
-                tmps = []
-                for i in range(self.width):
-                    tmp1 = []
-                    tmp2 = []
-                    for j in range(self.width):
-                        if ground[i][j] != 0:
-                            tmp1.append(ground[i][j])
-                        if ground[j][i] != 0:
-                            tmp2.append(ground[j][i])
-                    tmps.append(tmp1)
-                    tmps.append(tmp2)
-                for tmp in tmps:
-                    if len(tmp) <= 1:
-                        break
-                    tip_l = 0
-                    tip_r = 1
-                    while True:
-                        if tmp[tip_l] != tmp[tip_r]:
-                            tip_l += 1
-                            tip_r += 1
-                        else:
-                            result += np.log2(tmp[tip_l])
-                            tip_l += 2
-                            tip_r += 2
-                        if tip_l >= len(tmp) or tip_r >= len(tmp):
-                            break
-            return result
-
-        assess_score = np.log2(np.sum(ground))
-        assess_empty = sum(sum(ground == 0))
-        assess_succession = culculate_succession(ground)
-        big_num_locs = list(np.argwhere(ground == np.max(ground)))
-        big_num_corner_diss = [[abs(row - row_c) + abs(col - col_c) for row_c, col_c in
-                                [(0, 0), (0, self.width - 1), (self.width - 1, 0),
-                                 (self.width - 1, self.width - 1)]] for row, col
-                               in big_num_locs]
-        assess_corner = np.mean([max(t) for t in big_num_corner_diss])
-        assess_array = np.array([assess_score, assess_empty, assess_succession, assess_corner])
-        weights = [1, 2, 1, 4]
-        assess = sum(assess_array * weights)
-        return assess
-
     def heuristic(self, ground):
         def culculate_succession(ground):
             result = 0
