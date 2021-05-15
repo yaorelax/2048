@@ -3,6 +3,9 @@ import pygame
 import sys
 import random
 import time
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from pygame.locals import *
 from collections import OrderedDict
@@ -412,6 +415,7 @@ class Play2048:
             self.__random_generate()
             if self.__debug:
                 print(self.__playground)
+        return score
 
     def fake_move(self, direction, current_playground=None):
         if current_playground is None:
@@ -718,6 +722,149 @@ def expectimax_algorithm(env, max_depth):
             if episode >= MAX_EPISODE:
                 return scores
 
+def dqn_algorithm(env, x=None):
+    global MAX_EPISODE
+    MAX_EPISODE = 10000
+    play = env.play
+
+    BATCH_SIZE = 128
+    LR = 0.01
+    GAMMA = 0.90
+    EPISILO = 0.1
+    MEMORY_CAPACITY = 2000
+    Q_NETWORK_ITERATION = 100
+
+    NUM_ACTIONS = len(play.DIRECTIONS)
+    NUM_STATES = play.width * play.width
+    ENV_A_SHAPE = 0
+
+    class Net(nn.Module):
+        """docstring for Net"""
+
+        def __init__(self):
+            super(Net, self).__init__()
+            self.fc1 = nn.Linear(NUM_STATES, 50)
+            self.fc1.weight.data.normal_(0, 0.1)
+            self.fc2 = nn.Linear(50, 30)
+            self.fc2.weight.data.normal_(0, 0.1)
+            self.out = nn.Linear(30, NUM_ACTIONS)
+            self.out.weight.data.normal_(0, 0.1)
+
+        def forward(self, x):
+            x = self.fc1(x)
+            x = F.relu(x)
+            x = self.fc2(x)
+            x = F.relu(x)
+            action_prob = self.out(x)
+            return action_prob
+
+    class DQN():
+        """docstring for DQN"""
+
+        def __init__(self):
+            super(DQN, self).__init__()
+            self.eval_net, self.target_net = Net(), Net()
+
+            self.learn_step_counter = 0
+            self.memory_counter = 0
+            self.memory = np.zeros((MEMORY_CAPACITY, NUM_STATES * 2 + 2))
+            # why the NUM_STATE*2 +2
+            # When we store the memory, we put the state, action, reward and next_state in the memory
+            # here reward and action is a number, state is a ndarray
+            self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
+            self.loss_func = nn.MSELoss()
+
+        def choose_action(self, state):
+            state = torch.unsqueeze(torch.FloatTensor(state), 0)  # get a 1D array
+            if np.random.randn() <= EPISILO:  # greedy policy
+                action = np.random.randint(0, NUM_ACTIONS)
+                action = action if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
+            else:  # random policy
+                action_value = self.eval_net.forward(state)
+                action = torch.max(action_value, 1)[1].data.numpy()
+                action = action[0] if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
+            return action
+
+        def store_transition(self, state, action, reward, next_state):
+            transition = np.hstack((state, [action, reward], next_state))
+            index = self.memory_counter % MEMORY_CAPACITY
+            self.memory[index, :] = transition
+            self.memory_counter += 1
+
+        def learn(self):
+
+            # update the parameters
+            if self.learn_step_counter % Q_NETWORK_ITERATION == 0:
+                self.target_net.load_state_dict(self.eval_net.state_dict())
+            self.learn_step_counter += 1
+
+            # sample batch from memory
+            sample_index = np.random.choice(MEMORY_CAPACITY, BATCH_SIZE)
+            batch_memory = self.memory[sample_index, :]
+            batch_state = torch.FloatTensor(batch_memory[:, :NUM_STATES])
+            batch_action = torch.LongTensor(batch_memory[:, NUM_STATES:NUM_STATES + 1].astype(int))
+            batch_reward = torch.FloatTensor(batch_memory[:, NUM_STATES + 1:NUM_STATES + 2])
+            batch_next_state = torch.FloatTensor(batch_memory[:, -NUM_STATES:])
+
+            # q_eval
+            q_eval = self.eval_net(batch_state).gather(1, batch_action)
+            q_next = self.target_net(batch_next_state).detach()
+            q_target = batch_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)
+            loss = self.loss_func(q_eval, q_target)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+    def get_state():
+        ground = np.array([[x for x in row] for row in play.get_playground()])
+        flatten_ground = ground.flatten()
+        state = np.log(flatten_ground + 1) / 16
+        return state
+
+    dqn = DQN()
+    is_updated = True
+    episode = 0
+    ep_reward = 0
+    step = 0
+    scores = []
+    state = get_state()
+    while True:
+        if is_updated:
+            env.update_env()
+            is_updated = False
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                sys.exit()
+        pygame.display.flip()
+        pygame.event.pump()
+        if not play.is_terminal():
+            action = dqn.choose_action(state)
+            direction = play.DIRECTIONS[action]
+            reward = float(play.move(direction))
+            next_state = get_state()
+            dqn.store_transition(state, action, reward, next_state)
+            ep_reward += reward
+            if dqn.memory_counter >= MEMORY_CAPACITY:
+                dqn.learn()
+            state = next_state
+            is_updated = True
+            step += 1
+        else:
+            print('[%s]episode:%3d score:%4d step:%3d max_block:%4d'
+                  % ('dqn',
+                     episode,
+                     play.get_score(),
+                     step,
+                     np.max(play.get_playground())))
+            scores.append(play.get_score())
+            episode += 1
+            ep_reward = 0
+            step = 0
+            play.restart()
+            if episode >= MAX_EPISODE:
+                return scores
+
 def ai_play(env):
     configs = []
     # assess_score, assess_empty, assess_succession, assess_corner
@@ -767,11 +914,14 @@ def ai_play(env):
 
     plt.show()
 
+
+
 def main():
     play = Play2048(width=4, debug=False)
     env = ENV(play)
     # human_play(env)
-    ai_play(env)
+    # ai_play(env)
+    dqn_algorithm(env)
 
 if __name__ == '__main__':
     main()
