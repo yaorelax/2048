@@ -64,8 +64,7 @@ class Play2048:
         self.width = width
         self.__score = 0
         self.__init_playground()
-        self.__random_generate()
-        self.__random_generate()
+        self.__random_generate(n=2)
         if self.__debug:
             print('init:(%s * %s)' % (width, width))
             print(self.__playground)
@@ -102,17 +101,12 @@ class Play2048:
             if len(tmp) == 0:
                 continue
             elif len(tmp) >= 1:
-                for _ in range(len(tmp) - 1):
-                    tip = 0
-                    while True:
-                        if tip < len(tmp) - 1:
-                            if tmp[tip] == tmp[tip + 1]:
-                                score += tmp[tip]
-                                tmp[tip] *= 2
-                                del tmp[tip + 1]
-                            tip += 1
-                        else:
-                            break
+                for tip in range(len(tmp) - 1):
+                    if tip < len(tmp) - 1:
+                        if tmp[tip] == tmp[tip + 1]:
+                            score += tmp[tip]
+                            tmp[tip] *= 2
+                            del tmp[tip + 1]
                 for j in range(len(ground)):
                     if j < len(tmp):
                         ground[i][j] = tmp[j]
@@ -444,8 +438,7 @@ class Play2048:
         self.__terminal = False
         self.__score = 0
         self.__init_playground()
-        self.__random_generate()
-        self.__random_generate()
+        self.__random_generate(n=2)
         if self.__debug:
             print('restart:')
             print(self.__playground)
@@ -666,9 +659,6 @@ def expectimax_algorithm(env, max_depth):
                     alpha_ = search(child, depth - 1)
                     brain.remember(hash(str((child, depth - 1))), alpha_)
                 alpha = max(alpha, alpha_)
-
-                # without memory
-                # alpha = max(alpha, search(child, depth - 1))
         else:
             alpha = 0
             zeros = [(i, j) for i, j in list(np.argwhere(ground == 0))]
